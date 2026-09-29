@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 function ContactsPage() {
     const [showForm, setShowForm] = useState(false);
-    const [editIndex, setEditIndex] = useState(null);
+    const [editId, setEditId] = useState(null);
     const [search, setSearch] = useState("");
     const [error, setError] = useState("");
 
@@ -18,9 +18,9 @@ function ContactsPage() {
 
     const [contacts, setContacts] = useState([]);
 
-    // GET contacts from MySQL
-    useEffect(() => {
-        fetch("http://localhost:5000/contacts")
+    // GET contacts
+    const fetchContacts = () => {
+        fetch("https://crm-backend-l81t.onrender.com/contacts")
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Failed to fetch contacts");
@@ -37,6 +37,10 @@ function ContactsPage() {
                 setFetchError("Unable to load contacts");
                 setLoading(false);
             });
+    };
+
+    useEffect(() => {
+        fetchContacts();
     }, []);
 
     const handleSubmit = (e) => {
@@ -52,7 +56,10 @@ function ContactsPage() {
             return;
         }
 
-        if (!formData.email.includes("@") || !formData.email.endsWith(".com")) {
+        if (
+            !formData.email.includes("@") ||
+            !formData.email.endsWith(".com")
+        ) {
             setError("Please enter a valid email");
             return;
         }
@@ -67,78 +74,100 @@ function ContactsPage() {
             return;
         }
 
-        if (editIndex !== null) {
-            fetch(`http://localhost:5000/contacts/${contacts[editIndex].id}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(formData)
-            })
-                .then((response) => response.json())
-                .then((data) => {
-                    console.log(data);
+        const url =
+            editId !== null
+                ? `https://crm-backend-l81t.onrender.com/contacts/${editId}`
+                : "https://crm-backend-l81t.onrender.com/contacts";
 
-                    fetch("http://localhost:5000/contacts")
-                        .then((response) => response.json())
-                        .then((contactsData) => {
-                            setContacts(contactsData);
-                        });
-                });
-        } else {
-            fetch("http://localhost:5000/contacts", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(formData)
-            })
-                .then((response) => response.json())
-                .then((data) => {
-                    console.log(data);
+        const method = editId !== null ? "PUT" : "POST";
 
-                    fetch("http://localhost:5000/contacts")
-                        .then((response) => response.json())
-                        .then((contactsData) => {
-                            setContacts(contactsData);
-                        });
-                });
-        }
-
-        setShowForm(false);
-        setEditIndex(null);
-
-        setFormData({
-            name: "",
-            email: "",
-            phone: "",
-            company: ""
-        });
-
-        setError("");
-    };
-
-    const handleDelete = (id) => {
-        fetch(`http://localhost:5000/contacts/${id}`, {
-            method: "DELETE"
+        fetch(url, {
+            method: method,
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(formData)
         })
-            .then((response) => response.json())
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Failed to save contact");
+                }
+
+                return response.json();
+            })
             .then((data) => {
                 console.log(data);
 
-                fetch("http://localhost:5000/contacts")
-                    .then((response) => response.json())
-                    .then((contactsData) => {
-                        setContacts(contactsData);
-                    });
+                fetchContacts();
+
+                setShowForm(false);
+                setEditId(null);
+
+                setFormData({
+                    name: "",
+                    email: "",
+                    phone: "",
+                    company: ""
+                });
+
+                setError("");
+            })
+            .catch((error) => {
+                console.log(error);
+                setError("Unable to save contact");
             });
     };
 
-    const handleEdit = (index) => {
-        setEditIndex(index);
-        setFormData(contacts[index]);
+    const handleDelete = (id) => {
+        fetch(
+            `https://crm-backend-l81t.onrender.com/contacts/${id}`,
+            {
+                method: "DELETE"
+            }
+        )
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Failed to delete contact");
+                }
+
+                return response.json();
+            })
+            .then((data) => {
+                console.log(data);
+                fetchContacts();
+            })
+            .catch((error) => {
+                console.log(error);
+            });
+    };
+
+    const handleEdit = (contact) => {
+        setEditId(contact.id);
+
+        setFormData({
+            name: contact.name,
+            email: contact.email,
+            phone: contact.phone,
+            company: contact.company
+        });
+
+        setError("");
         setShowForm(true);
     };
+
+    const filteredContacts = contacts.filter(
+        (contact) =>
+            contact.name
+                .toLowerCase()
+                .includes(search.toLowerCase()) ||
+            contact.email
+                .toLowerCase()
+                .includes(search.toLowerCase()) ||
+            contact.phone.includes(search) ||
+            contact.company
+                .toLowerCase()
+                .includes(search.toLowerCase())
+    );
 
     return (
         <section className="contacts-page">
@@ -151,13 +180,16 @@ function ContactsPage() {
 
                 <button
                     onClick={() => {
-                        setEditIndex(null);
+                        setEditId(null);
+
                         setFormData({
                             name: "",
                             email: "",
                             phone: "",
                             company: ""
                         });
+
+                        setError("");
                         setShowForm(true);
                     }}
                 >
@@ -191,55 +223,50 @@ function ContactsPage() {
 
                         {loading && (
                             <tr>
-                                <td colSpan="5">Loading...</td>
+                                <td colSpan="5">
+                                    Loading...
+                                </td>
                             </tr>
                         )}
 
                         {fetchError && (
                             <tr>
-                                <td colSpan="5">{fetchError}</td>
+                                <td colSpan="5">
+                                    {fetchError}
+                                </td>
                             </tr>
                         )}
 
                         {!loading &&
                             !fetchError &&
-                            contacts
-                                .filter((contact) =>
-                                    contact.name
-                                        .toLowerCase()
-                                        .includes(search.toLowerCase()) ||
-                                    contact.email
-                                        .toLowerCase()
-                                        .includes(search.toLowerCase()) ||
-                                    contact.phone.includes(search) ||
-                                    contact.company
-                                        .toLowerCase()
-                                        .includes(search.toLowerCase())
-                                )
-                                .map((contact, index) => (
-                                    <tr key={contact.id}>
-                                        <td>{contact.name}</td>
-                                        <td>{contact.email}</td>
-                                        <td>{contact.phone}</td>
-                                        <td>{contact.company}</td>
+                            filteredContacts.map((contact) => (
+                                <tr key={contact.id}>
 
-                                        <td>
-                                            <button
-                                                onClick={() => handleEdit(index)}
-                                            >
-                                                Edit
-                                            </button>
+                                    <td>{contact.name}</td>
+                                    <td>{contact.email}</td>
+                                    <td>{contact.phone}</td>
+                                    <td>{contact.company}</td>
 
-                                            <button
-                                                onClick={() =>
-                                                    handleDelete(contact.id)
-                                                }
-                                            >
-                                                Delete
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                    <td>
+                                        <button
+                                            onClick={() =>
+                                                handleEdit(contact)
+                                            }
+                                        >
+                                            Edit
+                                        </button>
+
+                                        <button
+                                            onClick={() =>
+                                                handleDelete(contact.id)
+                                            }
+                                        >
+                                            Delete
+                                        </button>
+                                    </td>
+
+                                </tr>
+                            ))}
 
                     </tbody>
                 </table>
@@ -262,6 +289,7 @@ function ContactsPage() {
                             value={formData.name}
                             onChange={(e) => {
                                 setError("");
+
                                 setFormData({
                                     ...formData,
                                     name: e.target.value
@@ -275,6 +303,7 @@ function ContactsPage() {
                             value={formData.email}
                             onChange={(e) => {
                                 setError("");
+
                                 setFormData({
                                     ...formData,
                                     email: e.target.value
@@ -288,6 +317,7 @@ function ContactsPage() {
                             value={formData.phone}
                             onChange={(e) => {
                                 setError("");
+
                                 setFormData({
                                     ...formData,
                                     phone: e.target.value
@@ -301,6 +331,7 @@ function ContactsPage() {
                             value={formData.company}
                             onChange={(e) => {
                                 setError("");
+
                                 setFormData({
                                     ...formData,
                                     company: e.target.value
@@ -309,14 +340,18 @@ function ContactsPage() {
                         />
 
                         <button type="submit">
-                            {editIndex !== null
+                            {editId !== null
                                 ? "Update Contact"
                                 : "Save Contact"}
                         </button>
 
                         <button
                             type="button"
-                            onClick={() => setShowForm(false)}
+                            onClick={() => {
+                                setShowForm(false);
+                                setEditId(null);
+                                setError("");
+                            }}
                         >
                             Cancel
                         </button>

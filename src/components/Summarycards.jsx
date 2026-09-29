@@ -10,7 +10,7 @@ function SummaryCards() {
     });
 
     useEffect(() => {
-        fetch("http://localhost:5000/dashboard")
+        fetch("https://crm-backend-l81t.onrender.com/dashboard")
             .then((response) => response.json())
             .then((data) => {
                 setStats(data);

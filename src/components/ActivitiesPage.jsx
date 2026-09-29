@@ -6,8 +6,22 @@ function ActivitiesPage() {
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState("");
 
+    const [showForm, setShowForm] = useState(false);
+    const [error, setError] = useState("");
+    const [editIndex, setEditIndex] = useState(null);
+    const [search, setSearch] = useState("");
+
+    const [formData, setFormData] = useState({
+        title: "",
+        type: "Call",
+        company: "",
+        date: "",
+        status: "Pending"
+    });
+
+    // GET activities
     useEffect(() => {
-        fetch("http://localhost:5000/activities")
+        fetch("https://crm-backend-l81t.onrender.com/activities")
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Failed to fetch activities");
@@ -27,19 +41,6 @@ function ActivitiesPage() {
             });
     }, []);
 
-    const [showForm, setShowForm] = useState(false);
-    const [error, setError] = useState("");
-    const [editIndex, setEditIndex] = useState(null);
-    const [search, setSearch] = useState("");
-
-    const [formData, setFormData] = useState({
-        title: "",
-        type: "Call",
-        company: "",
-        date: "",
-        status: "Pending"
-    });
-
     const handleSubmit = (e) => {
         e.preventDefault();
 
@@ -51,42 +52,71 @@ function ActivitiesPage() {
         setError("");
 
         if (editIndex !== null) {
-            fetch(`http://localhost:5000/activities/${editIndex}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(formData)
-            })
-                .then((response) => response.json())
+            // UPDATE activity
+            fetch(
+                `https://crm-backend-l81t.onrender.com/activities/${editIndex}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(formData)
+                }
+            )
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Failed to update activity");
+                    }
+
+                    return response.json();
+                })
                 .then((data) => {
                     console.log(data);
 
-                    fetch("http://localhost:5000/activities")
-                        .then((response) => response.json())
-                        .then((activitiesData) => {
-                            setActivities(activitiesData);
-                        });
+                    return fetch(
+                        "https://crm-backend-l81t.onrender.com/activities"
+                    );
+                })
+                .then((response) => response.json())
+                .then((activitiesData) => {
+                    setActivities(activitiesData);
+                })
+                .catch((error) => {
+                    console.log(error);
+                    setError("Unable to update activity");
                 });
 
             setEditIndex(null);
         } else {
-            fetch("http://localhost:5000/activities", {
+            // ADD activity
+            fetch("https://crm-backend-l81t.onrender.com/activities", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify(formData)
             })
-                .then((response) => response.json())
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Failed to add activity");
+                    }
+
+                    return response.json();
+                })
                 .then((data) => {
                     console.log(data);
 
-                    fetch("http://localhost:5000/activities")
-                        .then((response) => response.json())
-                        .then((activitiesData) => {
-                            setActivities(activitiesData);
-                        });
+                    return fetch(
+                        "https://crm-backend-l81t.onrender.com/activities"
+                    );
+                })
+                .then((response) => response.json())
+                .then((activitiesData) => {
+                    setActivities(activitiesData);
+                })
+                .catch((error) => {
+                    console.log(error);
+                    setError("Unable to add activity");
                 });
         }
 
@@ -102,18 +132,32 @@ function ActivitiesPage() {
     };
 
     const handleDelete = (id) => {
-        fetch(`http://localhost:5000/activities/${id}`, {
-            method: "DELETE"
-        })
-            .then((response) => response.json())
+        fetch(
+            `https://crm-backend-l81t.onrender.com/activities/${id}`,
+            {
+                method: "DELETE"
+            }
+        )
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Failed to delete activity");
+                }
+
+                return response.json();
+            })
             .then((data) => {
                 console.log(data);
 
-                fetch("http://localhost:5000/activities")
-                    .then((response) => response.json())
-                    .then((activitiesData) => {
-                        setActivities(activitiesData);
-                    });
+                return fetch(
+                    "https://crm-backend-l81t.onrender.com/activities"
+                );
+            })
+            .then((response) => response.json())
+            .then((activitiesData) => {
+                setActivities(activitiesData);
+            })
+            .catch((error) => {
+                console.log(error);
             });
     };
 
@@ -122,22 +166,37 @@ function ActivitiesPage() {
             (activity) => activity.id === id
         );
 
-        setFormData(activity);
+        setFormData({
+            title: activity.title,
+            type: activity.type,
+            company: activity.company,
+            date: activity.date,
+            status: activity.status
+        });
+
         setEditIndex(id);
         setShowForm(true);
         setError("");
     };
 
-    const filteredActivities = activities.filter((activity) =>
-        activity.title.toLowerCase().includes(search.toLowerCase()) ||
-        activity.company.toLowerCase().includes(search.toLowerCase()) ||
-        activity.type.toLowerCase().includes(search.toLowerCase())
+    const filteredActivities = activities.filter(
+        (activity) =>
+            activity.title
+                .toLowerCase()
+                .includes(search.toLowerCase()) ||
+            activity.company
+                .toLowerCase()
+                .includes(search.toLowerCase()) ||
+            activity.type
+                .toLowerCase()
+                .includes(search.toLowerCase())
     );
 
     return (
         <section className="activities-page">
 
             <div className="activities-page-header">
+
                 <div>
                     <h2>Activities</h2>
                     <p>Track calls, meetings and follow-ups</p>
@@ -161,6 +220,7 @@ function ActivitiesPage() {
                 >
                     + Add Activity
                 </button>
+
             </div>
 
             <div className="activities-list">
@@ -184,55 +244,60 @@ function ActivitiesPage() {
 
                 {!loading &&
                     !fetchError &&
-                    filteredActivities.map((activity) => {
-                        const index = activities.indexOf(activity);
+                    filteredActivities.map((activity) => (
 
-                        return (
-                            <div
-                                className="activity-row"
-                                key={activity.id}
-                            >
+                        <div
+                            className="activity-row"
+                            key={activity.id}
+                        >
 
-                                <div className="activity-icon">
-                                    {activity.type === "Call" && "☎"}
-                                    {activity.type === "Email" && "✉"}
-                                    {activity.type === "Meeting" && "●"}
-                                    {activity.type === "Follow-up" && "✓"}
-                                </div>
+                            <div className="activity-icon">
+                                {activity.type === "Call" && "☎"}
+                                {activity.type === "Email" && "✉"}
+                                {activity.type === "Meeting" && "●"}
+                                {activity.type === "Follow-up" && "✓"}
+                            </div>
 
-                                <div className="activity-content">
-                                    <p>{activity.title}</p>
+                            <div className="activity-content">
 
-                                    <small>
-                                        {activity.date} · {activity.company}
-                                    </small>
-                                </div>
+                                <p>
+                                    {activity.title}
+                                </p>
 
-                                <span>{activity.type}</span>
-
-                                <button
-                                    onClick={() =>
-                                        handleEdit(activity.id)
-                                    }
-                                >
-                                    Edit
-                                </button>
-
-                                <button
-                                    onClick={() =>
-                                        handleDelete(activity.id)
-                                    }
-                                >
-                                    Delete
-                                </button>
+                                <small>
+                                    {activity.date} · {activity.company}
+                                </small>
 
                             </div>
-                        );
-                    })}
+
+                            <span>
+                                {activity.type}
+                            </span>
+
+                            <button
+                                onClick={() =>
+                                    handleEdit(activity.id)
+                                }
+                            >
+                                Edit
+                            </button>
+
+                            <button
+                                onClick={() =>
+                                    handleDelete(activity.id)
+                                }
+                            >
+                                Delete
+                            </button>
+
+                        </div>
+
+                    ))}
 
             </div>
 
             {showForm && (
+
                 <form
                     className="activity-form"
                     onSubmit={handleSubmit}
@@ -308,7 +373,9 @@ function ActivitiesPage() {
                     </select>
 
                     <button type="submit">
-                        Save Activity
+                        {editIndex !== null
+                            ? "Update Activity"
+                            : "Save Activity"}
                     </button>
 
                     <button
@@ -323,6 +390,7 @@ function ActivitiesPage() {
                     </button>
 
                 </form>
+
             )}
 
         </section>

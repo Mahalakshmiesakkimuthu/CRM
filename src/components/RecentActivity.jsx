@@ -7,7 +7,7 @@ function RecentActivity() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        fetch("http://localhost:5000/activities")
+        fetch("https://crm-backend-l81t.onrender.com/activities")
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Failed to fetch activities");

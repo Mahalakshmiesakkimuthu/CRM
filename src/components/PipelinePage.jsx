@@ -29,7 +29,7 @@ function PipelinePage() {
 
     // Dashboard statistics
     useEffect(() => {
-        fetch("http://localhost:5000/dashboard")
+        fetch("https://crm-backend-l81t.onrender.com/dashboard")
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Failed to fetch dashboard stats");
@@ -48,7 +48,7 @@ function PipelinePage() {
 
     // Pipeline deals
     useEffect(() => {
-        fetch("http://localhost:5000/pipeline")
+        fetch("https://crm-backend-l81t.onrender.com/pipeline")
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Failed to fetch pipeline");
@@ -85,18 +85,23 @@ function PipelinePage() {
         if (editIndex !== null) {
             const id = deals[editIndex].id;
 
-            fetch(`http://localhost:5000/pipeline/${id}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(formData)
-            })
+            fetch(
+                `https://crm-backend-l81t.onrender.com/pipeline/${id}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(formData)
+                }
+            )
                 .then((response) => response.json())
                 .then((data) => {
                     console.log(data);
 
-                    fetch("http://localhost:5000/pipeline")
+                    fetch(
+                        "https://crm-backend-l81t.onrender.com/pipeline"
+                    )
                         .then((response) => response.json())
                         .then((pipelineData) => {
                             setDeals(pipelineData);
@@ -105,18 +110,23 @@ function PipelinePage() {
 
             setEditIndex(null);
         } else {
-            fetch("http://localhost:5000/pipeline", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(formData)
-            })
+            fetch(
+                "https://crm-backend-l81t.onrender.com/pipeline",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(formData)
+                }
+            )
                 .then((response) => response.json())
                 .then((data) => {
                     console.log(data);
 
-                    fetch("http://localhost:5000/pipeline")
+                    fetch(
+                        "https://crm-backend-l81t.onrender.com/pipeline"
+                    )
                         .then((response) => response.json())
                         .then((pipelineData) => {
                             setDeals(pipelineData);
@@ -143,14 +153,19 @@ function PipelinePage() {
     };
 
     const handleDelete = (id) => {
-        fetch(`http://localhost:5000/pipeline/${id}`, {
-            method: "DELETE"
-        })
+        fetch(
+            `https://crm-backend-l81t.onrender.com/pipeline/${id}`,
+            {
+                method: "DELETE"
+            }
+        )
             .then((response) => response.json())
             .then((data) => {
                 console.log(data);
 
-                fetch("http://localhost:5000/pipeline")
+                fetch(
+                    "https://crm-backend-l81t.onrender.com/pipeline"
+                )
                     .then((response) => response.json())
                     .then((pipelineData) => {
                         setDeals(pipelineData);
@@ -173,10 +188,11 @@ function PipelinePage() {
         setShowForm(true);
     };
 
-    const filteredDeals = deals.filter((deal) =>
-        deal.name.toLowerCase().includes(search.toLowerCase()) ||
-        deal.company.toLowerCase().includes(search.toLowerCase()) ||
-        deal.owner.toLowerCase().includes(search.toLowerCase())
+    const filteredDeals = deals.filter(
+        (deal) =>
+            deal.name.toLowerCase().includes(search.toLowerCase()) ||
+            deal.company.toLowerCase().includes(search.toLowerCase()) ||
+            deal.owner.toLowerCase().includes(search.toLowerCase())
     );
 
     return (
