@@ -1,21 +1,26 @@
 require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
-const mysql = require("mysql2");
-const db = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
-});
-db.connect((err) => {
-    if (err) {
-        console.log("Database connection failed");
-        return;
-    }
+const { Pool } = require("pg");
 
-    console.log("MySQL connected");
+// PostgreSQL / Neon connection
+const db = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
+
+db.connect()
+    .then((client) => {
+        console.log("PostgreSQL connected");
+        client.release();
+    })
+    .catch((err) => {
+        console.log("Database connection failed");
+        console.log(err.message);
+    });
 
 const app = express();
 
@@ -23,290 +28,385 @@ app.use(cors());
 app.use(express.json());
 
 
-app.get("/activities", (req, res) => {
-    const sql = "SELECT * FROM activities";
+// ==================== ACTIVITIES ====================
 
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Database error"
-            });
-        }
+// GET all activities
+app.get("/activities", async (req, res) => {
+    try {
+        const result = await db.query("SELECT * FROM activities");
 
-        res.json(results);
-    });
-});
-app.get("/contacts", (req, res) => {
-    const sql = "SELECT * FROM contacts";
+        res.json(result.rows);
+    } catch (err) {
+        console.log(err);
 
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Database error"
-            });
-        }
-
-        res.json(results);
-    });
-});
-app.post("/contacts", (req, res) => {
-    const { name, email, phone, company } = req.body;
-
-    const sql = `
-        INSERT INTO contacts (name, email, phone, company)
-        VALUES (?, ?, ?, ?)
-    `;
-
-    db.query(
-        sql,
-        [name, email, phone, company],
-        (err, result) => {
-            if (err) {
-                console.log(err);
-                return res.status(500).json({
-                    message: "Database error",
-                    error: err.message
-                });
-            }
-
-            res.json({
-                message: "Contact added successfully",
-                id: result.insertId
-            });
-        }
-    );
-});
-
-app.put("/contacts/:id", (req, res) => {
-    const id = req.params.id;
-    const { name, email, phone, company } = req.body;
-
-    const sql = `
-        UPDATE contacts
-        SET name = ?, email = ?, phone = ?, company = ?
-        WHERE id = ?
-    `;
-
-    db.query(
-        sql,
-        [name, email, phone, company, id],
-        (err, result) => {
-            if (err) {
-                console.log(err);
-                return res.status(500).json({
-                    message: "Database error",
-                    error: err.message
-                });
-            }
-
-            res.json({
-                message: "Contact updated successfully"
-            });
-        }
-    );
-});
-
-app.delete("/contacts/:id", (req, res) => {
-    const id = req.params.id;
-
-    const sql = "DELETE FROM contacts WHERE id = ?";
-
-    db.query(sql, [id], (err, result) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Database error",
-                error: err.message
-            });
-        }
-
-        res.json({
-            message: "Contact deleted successfully"
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
         });
-    });
+    }
 });
-app.post("/activities", (req, res) => {
+
+
+// ADD activity
+app.post("/activities", async (req, res) => {
     const { title, type, company, date, status } = req.body;
 
     const sql = `
-        INSERT INTO activities (title, type, company, date, status)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO activities
+        (title, type, company, date, status)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
     `;
 
-    db.query(
-        sql,
-        [title, type, company, date, status],
-        (err, result) => {
-            if (err) {
-                console.log(err);
-                return res.status(500).json({
-                    message: "Database error",
-                    error: err.message
-                });
-            }
+    try {
+        const result = await db.query(sql, [
+            title,
+            type,
+            company,
+            date,
+            status
+        ]);
 
-            res.json({
-                message: "Activity added successfully",
-                id: result.insertId
-            });
-        }
-    );
+        res.json({
+            message: "Activity added successfully",
+            id: result.rows[0].id
+        });
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
 });
 
-app.put("/activities/:id", (req, res) => {
+
+// UPDATE activity
+app.put("/activities/:id", async (req, res) => {
     const id = req.params.id;
     const { title, type, company, date, status } = req.body;
 
     const sql = `
         UPDATE activities
-        SET title = ?, type = ?, company = ?, date = ?, status = ?
-        WHERE id = ?
+        SET
+            title = $1,
+            type = $2,
+            company = $3,
+            date = $4,
+            status = $5
+        WHERE id = $6
     `;
 
-    db.query(
-        sql,
-        [title, type, company, date, status, id],
-        (err, result) => {
-            if (err) {
-                console.log(err);
-                return res.status(500).json({
-                    message: "Database error",
-                    error: err.message
-                });
-            }
+    try {
+        await db.query(sql, [
+            title,
+            type,
+            company,
+            date,
+            status,
+            id
+        ]);
 
-            res.json({
-                message: "Activity updated successfully"
-            });
-        }
-    );
+        res.json({
+            message: "Activity updated successfully"
+        });
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
 });
 
-app.delete("/activities/:id", (req, res) => {
+
+// DELETE activity
+app.delete("/activities/:id", async (req, res) => {
     const id = req.params.id;
 
-    const sql = "DELETE FROM activities WHERE id = ?";
-
-    db.query(sql, [id], (err, result) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Database error",
-                error: err.message
-            });
-        }
+    try {
+        await db.query(
+            "DELETE FROM activities WHERE id = $1",
+            [id]
+        );
 
         res.json({
             message: "Activity deleted successfully"
         });
-    });
-});
-app.get("/pipeline", (req, res) => {
-    const sql = "SELECT * FROM pipeline";
+    } catch (err) {
+        console.log(err);
 
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Database error"
-            });
-        }
-
-        res.json(results);
-    });
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
 });
-app.post("/pipeline", (req, res) => {
+
+
+// ==================== CONTACTS ====================
+
+// GET all contacts
+app.get("/contacts", async (req, res) => {
+    try {
+        const result = await db.query(
+            "SELECT * FROM contacts"
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
+});
+
+
+// ADD contact
+app.post("/contacts", async (req, res) => {
+    const { name, email, phone, company } = req.body;
+
+    const sql = `
+        INSERT INTO contacts
+        (name, email, phone, company)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
+    `;
+
+    try {
+        const result = await db.query(sql, [
+            name,
+            email,
+            phone,
+            company
+        ]);
+
+        res.json({
+            message: "Contact added successfully",
+            id: result.rows[0].id
+        });
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
+});
+
+
+// UPDATE contact
+app.put("/contacts/:id", async (req, res) => {
+    const id = req.params.id;
+    const { name, email, phone, company } = req.body;
+
+    const sql = `
+        UPDATE contacts
+        SET
+            name = $1,
+            email = $2,
+            phone = $3,
+            company = $4
+        WHERE id = $5
+    `;
+
+    try {
+        await db.query(sql, [
+            name,
+            email,
+            phone,
+            company,
+            id
+        ]);
+
+        res.json({
+            message: "Contact updated successfully"
+        });
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
+});
+
+
+// DELETE contact
+app.delete("/contacts/:id", async (req, res) => {
+    const id = req.params.id;
+
+    try {
+        await db.query(
+            "DELETE FROM contacts WHERE id = $1",
+            [id]
+        );
+
+        res.json({
+            message: "Contact deleted successfully"
+        });
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
+});
+
+
+// ==================== PIPELINE ====================
+
+// GET pipeline
+app.get("/pipeline", async (req, res) => {
+    try {
+        const result = await db.query(
+            "SELECT * FROM pipeline"
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
+});
+
+
+// ADD deal
+app.post("/pipeline", async (req, res) => {
     const { name, company, value, stage, owner } = req.body;
 
     const sql = `
-        INSERT INTO pipeline (name, company, value, stage, owner)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO pipeline
+        (name, company, value, stage, owner)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
     `;
 
-    db.query(
-        sql,
-        [name, company, value, stage, owner],
-        (err, result) => {
-            if (err) {
-                console.log(err);
-                return res.status(500).json({
-                    message: "Database error"
-                });
-            }
+    try {
+        const result = await db.query(sql, [
+            name,
+            company,
+            value,
+            stage,
+            owner
+        ]);
 
-            res.json({
-                message: "Deal added successfully",
-                id: result.insertId
-            });
-        }
-    );
+        res.json({
+            message: "Deal added successfully",
+            id: result.rows[0].id
+        });
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
 });
-app.put("/pipeline/:id", (req, res) => {
+
+
+// UPDATE deal
+app.put("/pipeline/:id", async (req, res) => {
     const id = req.params.id;
     const { name, company, value, stage, owner } = req.body;
 
     const sql = `
         UPDATE pipeline
-        SET name = ?, company = ?, value = ?, stage = ?, owner = ?
-        WHERE id = ?
+        SET
+            name = $1,
+            company = $2,
+            value = $3,
+            stage = $4,
+            owner = $5
+        WHERE id = $6
     `;
 
-    db.query(
-        sql,
-        [name, company, value, stage, owner, id],
-        (err) => {
-            if (err) {
-                console.log(err);
-                return res.status(500).json({
-                    message: "Database error"
-                });
-            }
+    try {
+        await db.query(sql, [
+            name,
+            company,
+            value,
+            stage,
+            owner,
+            id
+        ]);
 
-            res.json({
-                message: "Deal updated successfully"
-            });
-        }
-    );
+        res.json({
+            message: "Deal updated successfully"
+        });
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
 });
-app.delete("/pipeline/:id", (req, res) => {
+
+
+// DELETE deal
+app.delete("/pipeline/:id", async (req, res) => {
     const id = req.params.id;
 
-    const sql = "DELETE FROM pipeline WHERE id = ?";
-
-    db.query(sql, [id], (err) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Database error"
-            });
-        }
+    try {
+        await db.query(
+            "DELETE FROM pipeline WHERE id = $1",
+            [id]
+        );
 
         res.json({
             message: "Deal deleted successfully"
         });
-    });
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
 });
-app.get("/dashboard", (req, res) => {
+
+
+// ==================== DASHBOARD ====================
+
+app.get("/dashboard", async (req, res) => {
     const sql = `
         SELECT
-            COUNT(*) AS totalDeals,
-            COALESCE(SUM(value), 0) AS pipelineValue,
-            SUM(CASE WHEN stage = 'Closed Won' THEN 1 ELSE 0 END) AS closedWon
+            COUNT(*)::int AS "totalDeals",
+            COALESCE(SUM(value), 0) AS "pipelineValue",
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN stage = 'Closed Won' THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            )::int AS "closedWon"
         FROM pipeline
     `;
 
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Database error"
-            });
-        }
+    try {
+        const result = await db.query(sql);
 
-        const totalDeals = results[0].totalDeals;
-        const closedWon = results[0].closedWon || 0;
+        const totalDeals = result.rows[0].totalDeals;
+        const closedWon = result.rows[0].closedWon;
 
         const winRate =
             totalDeals > 0
@@ -315,12 +415,23 @@ app.get("/dashboard", (req, res) => {
 
         res.json({
             totalDeals,
-            pipelineValue: results[0].pipelineValue,
+            pipelineValue: result.rows[0].pipelineValue,
             closedWon,
             winRate
         });
-    });
+    } catch (err) {
+        console.log(err);
+
+        res.status(500).json({
+            message: "Database error",
+            error: err.message
+        });
+    }
 });
+
+
+// ==================== SERVER ====================
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, "0.0.0.0", () => {
