@@ -5,7 +5,7 @@ function Pipeline() {
     const [deals, setDeals] = useState([]);
 
     useEffect(() => {
-        fetch("https://crm-backend-l81t.onrender.com")
+        fetch("https://crm-backend-l81t.onrender.com/pipeline")
             .then((response) => response.json())
             .then((data) => {
                 setDeals(data);
